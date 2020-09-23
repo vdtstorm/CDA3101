@@ -7,28 +7,35 @@
 		- This code uses the code fragment given
 		- This code must be compiled with -std=c99 to work correctly
 		- This will have a warning for the implicit declaration for strdup(), but is needed for my code
-		- I have tried other options, but strdup seems to be the way to go when it comes to getting the labels and their corresponding values
+		- I have tried other options, but strdup seems to be the way to go when it comes to getting the labels and 
+		their corresponding values for my array of strings 
+		- strdup() also causes a warning so "#define _GNU_SOURCE" had to be added to the beggining of my file 
+		
 */
-
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <ctype.h>
 #define MAXLINELENGTH 1000
 
 typedef struct // Used to get the address value of label
 {
-        char * key;
+        char  key[MAXLINELENGTH];
 	char * items[100];
         int val;
         int arg;
 }KeyVal;
+
 int readAndParse(FILE *, char *, char *, char *, char *, char *);
 int isNumber(char *);
 int isOpcode(char * check); // Checks for undefined Opcodes
 int isDuplicate(char ** label,int size,char * check); // Checks for duplicate labels
+int labelError(char * check); // Checks for undefined labels
+
 int main(int argc, char *argv[])
 {
     	char *inFileString, *outFileString;
@@ -60,8 +67,8 @@ int main(int argc, char *argv[])
     	}
 	// This loop grabs all labels and puts them into a character array
 	
-	//int fill = 0;
-	int c = 0;
+	
+	int c = 0; // increments kv
 	
 	KeyVal kv[100];
 	
@@ -69,13 +76,15 @@ int main(int argc, char *argv[])
 	
 	
 	// Giving labels their address
+	// Checks for errors
 	// 1st Pass
 	while(readAndParse(inFilePtr, label, opcode, arg0, arg1, arg2))
 	{
 		
 		
-		kv[c].key=strdup(label);
+		strcpy(kv[c].key,label);
 		kv[0].items[c]=strdup(label); // Used for duplicate label checking
+		
 		if(strcmp(opcode,".fill")!=0)
 			kv[c].val = c;
 			
@@ -96,9 +105,30 @@ int main(int argc, char *argv[])
 				}
 			}
 						
-		}		
-			
-		c++;
+		}
+		c++; // increments to add next label and value
+		
+		// Check for undefined variables
+		char * not = "Assembly File will not be made";
+		int result = labelError(label);		
+		if(result==1)
+		{
+			char * error1 = " is a label with longer than 6 characters";
+			strcat(label,error1);
+			puts(label); 
+			puts(not);
+			exit(1);
+		}
+		if(result==2)
+		{
+			char * error1 = " is an undefined label";
+                        strcat(label,error1);
+                        puts(label);
+			puts(not);
+                        exit(1);
+		}
+	
+		
 		// Error checking for duplicate labels
 		int check = isDuplicate(kv[0].items,c,label);
 		if(check > 1)
@@ -106,19 +136,34 @@ int main(int argc, char *argv[])
 			char * p = " is a duplicate label";
 			strcat(label,p);
 			puts(label);
+			puts(not);
 			exit(1);
 		}
+		
+		// Checks for undefined opcodes
+		int check1 = isOpcode(opcode);
+        	if(check1==0)
+        	{
+                	char * er = " is an undefined opcode";
+                	strcat(opcode,er);
+                	puts(opcode);
+			puts(not);
+                	exit(1);
+        	}
+		
 		
 	}
 	
 	
 	rewind(inFilePtr);
 	
+	/* This just prints out the labels and their values
 	for(int i = 0; i<c;i++)
 	{	if(strcmp(kv[i].key,"\0")!=0)
 			fprintf(outFilePtr,"%d)Label: %s\tAddress: %d\n",i,kv[i].key,kv[i].val);
 	}
-	// This puts labels into string array with corresonding address
+	*/
+
 	
 
 
@@ -140,8 +185,8 @@ int main(int argc, char *argv[])
 		// dest = r1 + r2
 		// op 24-22, regA 21-19, regB 18-16, unused 15-3, dest 15-0
 		
-		//Error Checking
-		//
+		
+		
 		
 		int regA;
 		int regB;
@@ -161,7 +206,7 @@ int main(int argc, char *argv[])
 			dest = dest << 0;
 			
 			result = add + regA + regB + unused + dest;
-			fprintf(outFilePtr,"%d.) %d\n",PC,result);
+			fprintf(outFilePtr,"Address %d: %d\n",PC,result);
 			PC++;
 		}
 		if(strcmp(opcode,"nand")==0)
@@ -177,7 +222,7 @@ int main(int argc, char *argv[])
                         dest = dest << 0;
 
                         result = nand + regA + regB + unused + dest;
-                        fprintf(outFilePtr,"%d.) %d\n",PC,result);
+                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
 			PC++;
 		}
 		if(strcmp(opcode,"lw")==0)
@@ -226,10 +271,12 @@ int main(int argc, char *argv[])
 			regA = regA << 19;
                         regB = regB << 16;
 			if(regC < 0)
-				regC = ~2&regC;
+				regC = ~(regC + 2);
+			else
+				regC = regC + 2;
                         regC = regC << 0;
 			result = lw + regA + regB + regC;
-                        fprintf(outFilePtr,"%d.) %d\n",PC,result);
+                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
 			PC++;
 		 
 		}
@@ -277,7 +324,7 @@ int main(int argc, char *argv[])
                         regB = regB << 16;
                         regC = regC << 0;
                         result = sw + regA + regB + regC;
-                        fprintf(outFilePtr,"%d.) %d\n",PC,result);
+                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
 			PC++;
 		}
 		if(strcmp(opcode,"beq")==0)
@@ -298,7 +345,7 @@ int main(int argc, char *argv[])
 			puts(process);
 			
                         result = halt + un;
-                        fprintf(outFilePtr,"%d.) %d\n",PC,result);
+                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
 			
 			PC++;
 		}
@@ -308,7 +355,7 @@ int main(int argc, char *argv[])
 			int un = 0 << 0;
 			
 			result = noop + un;
-                        fprintf(outFilePtr,"%d.) %d\n",PC,result);
+                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
 			PC++;
 		}
 		if(strcmp(opcode,".fill")==0)
@@ -325,12 +372,12 @@ int main(int argc, char *argv[])
                         }
                         else
                                 regA = atoi(arg0);
-			fprintf(outFilePtr,"%d.) %d\n",PC,regA);
+			fprintf(outFilePtr,"Address %d: %d\n",PC,regA);
 			PC++;
 		}
 		
     	}
-	char * done = "Assembler was successfull!";
+	char * done = "Assembler was successfull";
 	puts(done);
 	
     /* this is how to rewind the file ptr so that you start reading from the
@@ -402,15 +449,7 @@ int readAndParse(FILE *inFilePtr, char *label, char *opcode, char *arg0, char *a
     	sscanf(ptr, "%*[\t\n ]%[^\t\n ]%*[\t\n ]%[^\t\n ]%*[\t\n ]%[^\t\n ]%*[\t\n ]%[^\t\n ]",
         opcode, arg0, arg1, arg2);
 	
-	// Check if opcode is undefined
-	int check = isOpcode(opcode);
-        if(check==0)
-        {
-       		char * error = " is an undefined opcode";
-		strcat(opcode,error);
-		puts(opcode);
-                exit(1);
-        }
+	
     	return(1);
 }
 
@@ -448,9 +487,49 @@ int isDuplicate(char ** label,int size,char * check)
 		if(strcmp(check,label[i])==0)
 		{
 			if(strcmp(label[i],"\0")!=0)
+			{
 				dupe++; // Skipping empty spaces
+			}
 		}
 	}
 	
 	return dupe;
+}
+
+// Check if label are undefined
+// returns 1 if label is too long
+// returns 2 if label is undefined
+// returns 0 if correct 
+int labelError(char * check)
+{
+	
+	int result = 0;
+	int size = strlen(check);
+	// checking label length
+	if(size > 6)
+	{
+		result = 1;
+		
+	}
+	// Checks if label begins with a number
+	if(isdigit(check[0]))
+        {
+        	result = 2;
+        }
+	// Check if label is neither letter or number        
+	for(int i = 0; i < size; i++)
+	{
+		
+		if(!isalpha(check[i]))
+		{
+			if(!isdigit(check[i]))
+			{
+				
+				result = 2;
+				break;
+			}
+			
+		}
+	}
+	return result;
 }
