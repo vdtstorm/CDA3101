@@ -35,7 +35,7 @@ int isNumber(char *);
 int isOpcode(char * check); // Checks for undefined Opcodes
 int isDuplicate(char ** label,int size,char * check); // Checks for duplicate labels
 int labelError(char * check); // Checks for undefined labels
-
+int overFlow(int check); // checks for overflow
 int main(int argc, char *argv[])
 {
     	char *inFileString, *outFileString;
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 	
 	
 	// Giving labels their address
-	// Checks for errors
+	// Checks for label and opcode errors
 	// 1st Pass
 	while(readAndParse(inFilePtr, label, opcode, arg0, arg1, arg2))
 	{
@@ -84,46 +84,25 @@ int main(int argc, char *argv[])
 		
 		strcpy(kv[c].key,label);
 		kv[0].items[c]=strdup(label); // Used for duplicate label checking
-		
-		if(strcmp(opcode,".fill")!=0)
-			kv[c].val = c;
+		kv[c].val = c;
 			
 		// This is giving the label the value of the argument to the right of .fill
-		if(strcmp(opcode,".fill")==0)
-		{
-			
-			if(isNumber(arg0)==1)
-                        	kv[c].val = atoi(arg0);
-			else if(!isNumber(arg0))
-			{
-				for(int i = 0; i<c;i++)
-				{
-					if(strcmp(arg0,kv[i].key)==0)
-					{
-						kv[c].val = kv[i].val;
-					}
-				}
-			}
-						
-		}
+		
+		
 		c++; // increments to add next label and value
 		
 		// Check for undefined variables
-		char * not = "Assembly File will not be made";
+		char * not = "Assembly file will not be made";
 		int result = labelError(label);		
 		if(result==1)
 		{
-			char * error1 = " is a label with longer than 6 characters";
-			strcat(label,error1);
-			puts(label); 
+			printf("%s is a label with longer than 6 characters\n",label); 
 			puts(not);
 			exit(1);
 		}
 		if(result==2)
 		{
-			char * error1 = " is an undefined label";
-                        strcat(label,error1);
-                        puts(label);
+			printf("%s is an undefined label\n",label);
 			puts(not);
                         exit(1);
 		}
@@ -133,9 +112,7 @@ int main(int argc, char *argv[])
 		int check = isDuplicate(kv[0].items,c,label);
 		if(check > 1)
 		{
-			char * p = " is a duplicate label";
-			strcat(label,p);
-			puts(label);
+			printf("%s has a duplicate label\n",label);
 			puts(not);
 			exit(1);
 		}
@@ -144,9 +121,7 @@ int main(int argc, char *argv[])
 		int check1 = isOpcode(opcode);
         	if(check1==0)
         	{
-                	char * er = " is an undefined opcode";
-                	strcat(opcode,er);
-                	puts(opcode);
+                	printf("%s is an undefined opcode\n",opcode);
 			puts(not);
                 	exit(1);
         	}
@@ -157,12 +132,14 @@ int main(int argc, char *argv[])
 	
 	rewind(inFilePtr);
 	
-	/* This just prints out the labels and their values
+	// This just prints out the labels and their values
+	/*
 	for(int i = 0; i<c;i++)
 	{	if(strcmp(kv[i].key,"\0")!=0)
 			fprintf(outFilePtr,"%d)Label: %s\tAddress: %d\n",i,kv[i].key,kv[i].val);
 	}
 	*/
+
 
 	
 
@@ -192,6 +169,7 @@ int main(int argc, char *argv[])
 		int regB;
 		int regC;
 		int dest;
+		
         	if(strcmp(opcode,"add")==0)
 		{
 			int add = 0;
@@ -206,7 +184,7 @@ int main(int argc, char *argv[])
 			dest = dest << 0;
 			
 			result = add + regA + regB + unused + dest;
-			fprintf(outFilePtr,"Address %d: %d\n",PC,result);
+			fprintf(outFilePtr,"%d\n",result);
 			PC++;
 		}
 		if(strcmp(opcode,"nand")==0)
@@ -222,39 +200,15 @@ int main(int argc, char *argv[])
                         dest = dest << 0;
 
                         result = nand + regA + regB + unused + dest;
-                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
+                        fprintf(outFilePtr,"%d\n",result);
 			PC++;
 		}
 		if(strcmp(opcode,"lw")==0)
 		{
 			int lw = 2;
-			
-			
-			if(!isNumber(arg0))
-			{
-				for(int i = 0; i < c;i++)
-				{
-					if(strcmp(arg0,kv[i].key)==0)
-					{
-						regA = kv[i].val;
-					}
-				}
-			}
-			else	
-                        	regA = atoi(arg0);
-			if(!isNumber(arg1))
-                        {
-                                for(int i = 0; i < c;i++)
-                                {
-                                        if(strcmp(arg1,kv[i].key)==0)
-                                        {
-                                                regB = kv[i].val;
-                                        }
-                                }
-                        }
-			else
-                        	regB = atoi(arg1);
-			if(!isNumber(arg2))
+			regA = atoi(arg0);
+                       	regB = atoi(arg1);
+			if(!isNumber(arg2)) // Checks for label and gives label its value
                         {
                                 for(int i = 0; i < c;i++)
                                 {
@@ -266,48 +220,27 @@ int main(int argc, char *argv[])
                         }
 			else
                         	regC = atoi(arg2);
-                        
-			lw = lw <<22;
+			regC = overFlow(regC);
+			regC &= 0xFFFF;
+		 
+			lw = lw << 22;
 			regA = regA << 19;
                         regB = regB << 16;
-			if(regC < 0)
-				regC = ~(regC + 2);
-			else
-				regC = regC + 2;
-                        regC = regC << 0;
+		
+                        
+			
+			
 			result = lw + regA + regB + regC;
-                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
+                        fprintf(outFilePtr,"%d\n",result);
 			PC++;
 		 
 		}
 		if(strcmp(opcode,"sw")==0)
 		{
 			int sw = 3;
-			if(!isNumber(arg0))
-                        {
-                                for(int i = 0; i < c;i++)
-                                {
-                                        if(strcmp(arg0,kv[i].key)==0)
-                                        {
-                                                regA = kv[i].val;
-                                        }
-                                }
-                        }
-                        else
-                                regA = atoi(arg0);
-			if(!isNumber(arg1))
-                        {
-                                for(int i = 0; i < c;i++)
-                                {
-                                        if(strcmp(arg1,kv[i].key)==0)
-                                        {
-                                                regB = kv[i].val;
-                                        }
-                                }
-                        }
-                        else
-                                regB = atoi(arg1);
-			if(!isNumber(arg2))
+                        regA = atoi(arg0);
+                        regB = atoi(arg1);
+			if(!isNumber(arg2)) // Checks for label and gives label value
                         {
                                 for(int i = 0; i < c;i++)
                                 {
@@ -319,33 +252,84 @@ int main(int argc, char *argv[])
                         }
                         else
                                 regC = atoi(arg2);
+			regC = overFlow(regC); // overflow check
+                        regC &= 0xFFFF;
 			sw = sw << 22;
                         regA = regA << 19;
                         regB = regB << 16;
                         regC = regC << 0;
                         result = sw + regA + regB + regC;
-                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
+                        fprintf(outFilePtr,"%d\n",result);
 			PC++;
 		}
 		if(strcmp(opcode,"beq")==0)
 		{
-			//int beq = 4;
+			int beq = 4;
+			regA = atoi(arg0);
+			regB = atoi(arg1);
+			if(!isNumber(arg2)) // Checks for label and gives label value
+                        {
+                                for(int i = 0; i < c;i++)
+                                {
+                                        if(strcmp(arg2,kv[i].key)==0)
+                                        {
+                                                regC = kv[i].val;
+                                        }
+                                }
+                        }
+                        else
+                                regC = atoi(arg2);
+			
+			regC = overFlow(regC); // checks for overflow
+                        regC &= 0xFFFF; // shortens to lowest 16 bits
+			if(regA == regB)
+			{
+				regC = PC + 1;
+			}
+			beq = beq << 22;
+                        regA = regA << 19;
+                        regB = regB << 16;
+                        
+			result = beq + regA + regB + regC;
+			
+			fprintf(outFilePtr,"%d\n",result);
 			PC++;
 		}
 		if(strcmp(opcode,"jalr")==0)
 		{
-			PC++;
+			 if(!isNumber(arg0))
+                        {
+                                for(int i = 0; i < c;i++)
+                                {
+                                        if(strcmp(arg0,kv[i].key)==0)
+                                        {
+                                                regA = kv[i].val;
+                                        }
+                                }
+                        }
+			else
+				regA = atoi(arg0);
+			int jalr = 5;
+			regB = PC + 1; // inserting regB with PC + 1
+			PC = regA;
+			jalr = jalr << 22;
+			regA = regA << 19;
+			regB = regB << 16;
+			int u = 0 << 0;
+			result = jalr + regA + regB + u;
+			fprintf(outFilePtr,"%d\n",result);			
+			
+			
 		}
 		if(strcmp(opcode,"halt")==0)
 		{
 			int halt = 6 << 22;
                         int un = 0 << 0;
-			// Printing out indication of HALT
-			char * process = "Halt opcode was present";
-			puts(process);
+			printf("Program was halted\n");
+			
 			
                         result = halt + un;
-                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
+                        fprintf(outFilePtr,"%d\n",result);
 			
 			PC++;
 		}
@@ -355,7 +339,7 @@ int main(int argc, char *argv[])
 			int un = 0 << 0;
 			
 			result = noop + un;
-                        fprintf(outFilePtr,"Address %d: %d\n",PC,result);
+                        fprintf(outFilePtr,"%d\n",result);
 			PC++;
 		}
 		if(strcmp(opcode,".fill")==0)
@@ -372,7 +356,7 @@ int main(int argc, char *argv[])
                         }
                         else
                                 regA = atoi(arg0);
-			fprintf(outFilePtr,"Address %d: %d\n",PC,regA);
+			fprintf(outFilePtr,"%d\n",regA);
 			PC++;
 		}
 		
@@ -458,6 +442,18 @@ int isNumber(char *string)
    	/* return 1 if string is a number */
     	int i;
     	return( (sscanf(string, "%d", &i)) == 1);
+}
+
+
+int overFlow(int check)
+{
+	if(check > 32767 || check < -32768)
+	{
+		printf("Offset %d is out of range\n",check);
+	}
+	
+	return check;
+
 }
 
 // Returns 0 if opcode is undefined
