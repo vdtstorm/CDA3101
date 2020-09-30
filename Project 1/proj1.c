@@ -1,15 +1,14 @@
 /*
 	Name: Vinson Thomas (vdt16)
 	Class: CDA3101
-	Project 1: LC3101 Assembler
+	Project 1: LC-3101 Assembler
 	Programming Language: C
 	Comments
 		- This code uses the code fragment given
 		- This code must be compiled with -std=c99 to work correctly
-		- This will have a warning for the implicit declaration for strdup(), but is needed for my code
-		- I have tried other options, but strdup seems to be the way to go when it comes to getting the labels and 
-		their corresponding values for my array of strings 
-		- strdup() also causes a warning so "#define _GNU_SOURCE" had to be added to the beggining of my file 
+		- This will have a warning for the implicit declaration for strdup(), but is needed for my code 
+		- strdup() also causes a warnings so "#define _GNU_SOURCE" had to be added to the beggining of my file to not show them
+		- The only instruction I am not so sure about is the jalr instruction 
 		
 */
 #define _GNU_SOURCE
@@ -22,7 +21,7 @@
 #include <ctype.h>
 #define MAXLINELENGTH 1000
 
-typedef struct // Used to get the address value of label
+typedef struct // Used to pair label with corresponding address
 {
         char  key[MAXLINELENGTH];
 	char * items[100];
@@ -86,11 +85,11 @@ int main(int argc, char *argv[])
 		kv[0].items[c]=strdup(label); // Used for duplicate label checking
 		kv[c].val = c;
 			
-		// This is giving the label the value of the argument to the right of .fill
 		
 		
-		c++; // increments to add next label and value
 		
+		c++; // increments to add next label and address
+		// Error checking 
 		// Check for undefined variables
 		char * not = "Assembly file will not be made";
 		int result = labelError(label);		
@@ -132,7 +131,7 @@ int main(int argc, char *argv[])
 	
 	rewind(inFilePtr);
 	
-	// This just prints out the labels and their values
+	// Test that prints out the labels and their values
 	/*
 	for(int i = 0; i<c;i++)
 	{	if(strcmp(kv[i].key,"\0")!=0)
@@ -185,7 +184,7 @@ int main(int argc, char *argv[])
 			
 			result = add + regA + regB + unused + dest;
 			fprintf(outFilePtr,"%d\n",result);
-			PC++;
+			
 		}
 		if(strcmp(opcode,"nand")==0)
 		{
@@ -201,7 +200,7 @@ int main(int argc, char *argv[])
 
                         result = nand + regA + regB + unused + dest;
                         fprintf(outFilePtr,"%d\n",result);
-			PC++;
+			
 		}
 		if(strcmp(opcode,"lw")==0)
 		{
@@ -221,18 +220,18 @@ int main(int argc, char *argv[])
 			else
                         	regC = atoi(arg2);
 			regC = overFlow(regC);
-			regC &= 0xFFFF;
+			
 		 
 			lw = lw << 22;
 			regA = regA << 19;
                         regB = regB << 16;
-		
+			regC = regC << 0;
                         
 			
 			
 			result = lw + regA + regB + regC;
                         fprintf(outFilePtr,"%d\n",result);
-			PC++;
+			
 		 
 		}
 		if(strcmp(opcode,"sw")==0)
@@ -253,14 +252,14 @@ int main(int argc, char *argv[])
                         else
                                 regC = atoi(arg2);
 			regC = overFlow(regC); // overflow check
-                        regC &= 0xFFFF;
+                      
 			sw = sw << 22;
                         regA = regA << 19;
                         regB = regB << 16;
                         regC = regC << 0;
                         result = sw + regA + regB + regC;
                         fprintf(outFilePtr,"%d\n",result);
-			PC++;
+			
 		}
 		if(strcmp(opcode,"beq")==0)
 		{
@@ -279,23 +278,22 @@ int main(int argc, char *argv[])
                         }
                         else
                                 regC = atoi(arg2);
-			
-			regC = overFlow(regC); // checks for overflow
-                        regC &= 0xFFFF; // shortens to lowest 16 bits
-			if(regA == regB)
+			if(regA == regB) // Calculation if there is a branch
 			{
-				regC = PC + 1;
+				regC = regC - PC - 1;
+				
 			}
+			regC = overFlow(regC); // checks for overflow
 			beq = beq << 22;
                         regA = regA << 19;
                         regB = regB << 16;
-                        
+                        regC = regC << 0;
 			result = beq + regA + regB + regC;
 			
 			fprintf(outFilePtr,"%d\n",result);
-			PC++;
+			
 		}
-		if(strcmp(opcode,"jalr")==0)
+		if(strcmp(opcode,"jalr")==0) // Don't know if jalr is working correctly
 		{
 			 if(!isNumber(arg0))
                         {
@@ -311,7 +309,7 @@ int main(int argc, char *argv[])
 				regA = atoi(arg0);
 			int jalr = 5;
 			regB = PC + 1; // inserting regB with PC + 1
-			PC = regA;
+			//PC = regA;
 			jalr = jalr << 22;
 			regA = regA << 19;
 			regB = regB << 16;
@@ -331,7 +329,7 @@ int main(int argc, char *argv[])
                         result = halt + un;
                         fprintf(outFilePtr,"%d\n",result);
 			
-			PC++;
+			
 		}
 		if(strcmp(opcode,"noop")==0)
 		{
@@ -340,7 +338,7 @@ int main(int argc, char *argv[])
 			
 			result = noop + un;
                         fprintf(outFilePtr,"%d\n",result);
-			PC++;
+			
 		}
 		if(strcmp(opcode,".fill")==0)
 		{
@@ -357,28 +355,21 @@ int main(int argc, char *argv[])
                         else
                                 regA = atoi(arg0);
 			fprintf(outFilePtr,"%d\n",regA);
-			PC++;
+			
 		}
+		PC++;
 		
     	}
-	char * done = "Assembler was successfull";
-	puts(done);
+	printf("Assembler was successfull\n");
 	
-    /* this is how to rewind the file ptr so that you start reading from the
-        beginning of the file */
-    //rewind(inFilePtr);
-	 
-    /* after doing a readAndParse, you may want to do the following to test the
-        opcode */
 	
-    	if (!strcmp(opcode, "add")) 
-	{
-		
-        	/* do whatever you need to do for opcode "add" */
-    	}
+   
+
+	// Added closing files
 	fclose(inFilePtr);
-         fclose(outFilePtr);
-    	return(0);
+        fclose(outFilePtr);
+    	
+	return(0);
 }
 
 /*
@@ -451,7 +442,7 @@ int overFlow(int check)
 	{
 		printf("Offset %d is out of range\n",check);
 	}
-	
+	check &= 0xFFFF; // truncation
 	return check;
 
 }
