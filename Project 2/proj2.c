@@ -58,27 +58,32 @@ int main(int argc, char *argv[])
 	printf("memory[%d]=%d\n", state.numMemory, state.mem[state.numMemory]);
     }
 
-	// Simulation Code
-	// add for loop
+	// Initialzing variables
 	state.pc = 0;
 	int count = 0;
 	int temp  = 0;
 	int offset = 0;
 	bool halt = false;
 	int regA = 0, regB = 0, regC = 0;
+	
 	// Setting regs to zero
 	for(int i = 0; i < 8; i++)
         	state.reg[i] = 0;
-	while((state.mem[state.pc] >> 22) != HALT) // Goes until halt is seen
+
+	// Will cut off instructions if more than 200
+	while(halt == false) // Goes until halt is seen
 	{
-		
+		// counts instruction execution
+		count++;
 		printState(&state);
+		// Every if statement will check opcode 
+		// Then will convert registers
 		if((state.mem[state.pc] >> 22) == ADD) // Check for ADD instruction
 		{
 			regA = ((state.mem[state.pc] >> 19) & 7);
 			regB = ((state.mem[state.pc] >> 16) & 7);
 			regC = (state.mem[state.pc] & 7);
-			state.reg[regC] = regA + regB;
+			state.reg[regC] = state.reg[regA] + state.reg[regB];
 			
 		}
 
@@ -87,7 +92,7 @@ int main(int argc, char *argv[])
                 	regA = ((state.mem[state.pc] >> 19) & 7);
                 	regB = ((state.mem[state.pc] >> 16) & 7);
                 	regC = (state.mem[state.pc] & 7);
-			state.reg[regC] = ~(regA & regB);
+			state.reg[regC] = ~(state.reg[regA] & state.reg[regB]);
 			
         	}
 		
@@ -121,20 +126,17 @@ int main(int argc, char *argv[])
 			temp = convertNum(regC);
 			
                         // if regA == regB, PC = PC + 1 + OFFSET
-			/*
-			if(regA == regB)
+			// dont need to put 1 because PC + 1 at end of loop
+			if(state.reg[regA] == state.reg[regB])
 			{
-				state.pc = state.pc + 1 + temp;
-				
+				state.pc = state.pc + temp;
 			}
-			else
-			*/
 			
 			
 	
                 }
-		/*
-		else if((state.mem[state.pc] >> 22) == JALR) // Check for JALR instruction
+		
+		if((state.mem[state.pc] >> 22) == JALR) // Check for JALR instruction
                 {
                         regA = ((state.mem[state.pc] >> 19) & 7);
                         regB = ((state.mem[state.pc] >> 16) & 7);
@@ -142,14 +144,19 @@ int main(int argc, char *argv[])
                         {
                                 state.pc = state.pc + regA;
                         }
-			state.pc++;
 			
-                    
-                }
-		*/
+		}
+		
+		// Checks for halt in machine code
+		if((state.mem[state.pc] >> 22) == HALT)
+		{
+			halt = true;
+		}
+		
+		// Increments after every check
 		state.pc++;
-		count++;
-	
+		
+		
 		
 	}
 	
@@ -184,3 +191,4 @@ int convertNum(int num)
 	}
 	return(num);
 }
+
