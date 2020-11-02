@@ -1,3 +1,9 @@
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
 #define NUMMEMORY 65536 /* maximum number of data words in memory */
 #define NUMREGS 8 /* number of machine registers */
 
@@ -63,8 +69,9 @@ int field2(int instruction);
 int opcode(int instruction);
 void printInstruction(int instr);
 
-int main()
+int main(int argc, const char *argv[])
 {
+        stateType state, newState;
         while (1) {
 
                 printState(&state);
