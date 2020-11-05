@@ -67,8 +67,8 @@ int field0(int instruction);
 int field1(int instruction);
 int field2(int instruction);
 int opcode(int instruction);
+int convertNum(int num);
 void printInstruction(int instr);
-void IF(const stateType, stateType*);
 void ID(const stateType, stateType*);
 void EX(const stateType, stateType*);
 void MEM(const stateType, stateType*);
@@ -108,6 +108,14 @@ int main(int argc, const char *argv[])
         	}
         	printf("memory[%d]=%d\n", state.numMemory, state.instrMem[state.numMemory]);
 	}
+	printf( "%d memory words\n", state.numMemory );
+	printf( "\tinstruction memory:\n" );
+	for(int i = 0; i < state.numMemory; i++)
+	{
+		printf( "\t\tinstrMem[ %d ] ", i);
+		printInstruction(state.instrMem[i]);
+	}	
+	
 
 	// Setting pipline instructions to Noop instructions
 	state.pc = 0;
@@ -119,13 +127,13 @@ int main(int argc, const char *argv[])
 		state.reg[i] = 0;
 	}
 
-	// NOOPs
+	
 	state.IFID.instr = NOOPINSTRUCTION;
 	state.IDEX.instr = NOOPINSTRUCTION;
 	state.EXMEM.instr = NOOPINSTRUCTION;
 	state.MEMWB.instr = NOOPINSTRUCTION;
 	state.WBEND.instr = NOOPINSTRUCTION;
-
+	int regA = 0, regB = 0, offset = 0, temp = 0;
 	while (1) 
 	{
 
@@ -143,14 +151,89 @@ int main(int argc, const char *argv[])
 		newState.cycles++;
 
 		/* --------------------- IF stage --------------------- */
-
+		// Im grabbing the instruction and incrementing the PC+1
+		newState.IFID.instr = state.instrMem[state.pc];
+		newState.IFID.pcPlus1 = state.pc + 1;
+		newState.pc = state.pc + 1;
 		/* --------------------- ID stage --------------------- */
-
+		// Passing the instruction to the ID/EX stage
+		newState.IDEX.instr = state.IFID.instr;
+		// Transferring the PC + 1 also even if not needed
+		newState.IDEX.pcPlus1 = state.IFID.pcPlus1;
+		
+		newState.IDEX.readRegA = state.reg[field0(state.IFID.instr)];
+		newState.IDEX.readRegB = state.reg[field1(state.IFID.instr)];
+		newState.IDEX.offset = field2(state.IFID.instr);
+		temp = convertNum(newState.IDEX.offset);
+		regA = newState.IDEX.readRegA; 
+		regB = newState.IDEX.readRegB;
+		offset = temp;
 		/* --------------------- EX stage --------------------- */
+		newState.EXMEM.instr = state.IDEX.instr;
+		if(opcode(newState.EXMEM.instr) == ADD) // Check for ADD instruction
+		{
+			 newState.EXMEM.aluResult = regA + regB;  
+			
+		}
+		if(opcode(newState.EXMEM.instr) == NAND) // Check for NAND instruction
+                {
+                         newState.EXMEM.aluResult = ~(regA & regB);
+
+                }
+		if(opcode(newState.EXMEM.instr) == LW) // Check for LW instruction
+                {
+                         newState.EXMEM.aluResult = regA + offset;
+
+                }
+		if(opcode(newState.EXMEM.instr) == SW) // Check for SW instruction
+                {
+                         newState.EXMEM.aluResult = regA + offset;
+
+                }
+		if(opcode(newState.EXMEM.instr) == BEQ) // Check for BEQ instruction
+                {
+                         newState.EXMEM.aluResult = (regA == regB);
+
+                }
+		/*
+		if(opcode(newState.EXMEM.instr) == JALR) // Check for BEQ instruction
+                {
+                         newState.EXMEM.aluResult = (regA == regB);
+
+                }
+		*/
 
 		/* --------------------- MEM stage --------------------- */
+		newState.MEMWB.instr = state.EXMEM.instr;
+		if(opcode(newState.MEMWB.instr) == ADD || opcode(newState.MEMWB.instr) == NAND) // Check for ADD or NAND instruction
+                {
+                         newState.MEMWB.writeData = state.EXMEM.aluResult;
+
+                }
+		if(opcode(newState.MEMWB.instr) == LW) // Check for LW instruction
+                {
+                         newState.MEMWB.writeData = state.dataMem[state.EXMEM.aluResult];
+
+                }
+		if(opcode(newState.MEMWB.instr) == SW) // Check for SW instruction                                          
+                {
+                         newState.dataMem[state.EXMEM.aluResult] = state.EXMEM.readRegB;
+
+                }
 
 		/* --------------------- WB stage --------------------- */
+		newState.WBEND.instr = state.MEMWB.instr;
+		newState.WBEND.writeData = state.MEMWB.writeData;
+		if(opcode(newState.WBEND.instr) == ADD || opcode(newState.WBEND.instr) == NAND) // Check for ADD or NAND instruction
+                {
+                         newState.reg[field2(state.MEMWB.instr)] = state.MEMWB.writeData;
+
+                }
+                if(opcode(newState.MEMWB.instr) == LW) // Check for LW instruction                                          
+                {
+                         newState.reg[field1(state.MEMWB.instr)] = state.MEMWB.writeData;
+
+                }
 
 		state = newState; /* this is the last statement before end of the loop.
 			    		It marks the end of the cycle and updates the
@@ -250,3 +333,11 @@ void printInstruction(int instr)
 	field2(instr));
 }
 
+int convertNum(int num)
+{	/* convert a 16-bit number into a 32-bit Sun integer */
+	if (num & (1<<15) ) 
+	{    
+		num -= (1<<16);
+	}
+	return(num);
+}
